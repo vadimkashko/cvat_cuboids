@@ -2,5 +2,6 @@ cvat-sdk==2.3.0
 dash
 plotly
 numpy
+pandas
 gunicorn
 environs
