@@ -127,14 +127,13 @@ app.layout = html.Div([
               Input('task-id-dropdown', 'value'))
 def update_job_id_dropdown(selected_task):
     task = client.tasks.retrieve(selected_task)
-    jobs = sorted([job.id for job in task.get_jobs()])
-
     segments = {
         segment['jobs'][0]['id']: (
             segment['start_frame'],
             segment['stop_frame'],
         ) for segment in task.segments
     }
+    jobs = list(sorted(segments.keys()))
 
     return jobs, jobs[0], segments
 
