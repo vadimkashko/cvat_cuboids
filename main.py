@@ -200,10 +200,9 @@ def get_job_annotations(job_id):
               Input('job-annotations', 'data'))
 def show_image(task_id, job_id, frame_id, segments, annotations):
     job = client.jobs.retrieve(job_id)
-    job_frame_id = frame_id - segments[str(job_id)][0]
     image = job.get_frame(frame_id, quality='original')
     image = Image.open(image)  # type: ignore
-    annotation = annotations.get(str(job_frame_id))
+    annotation = annotations.get(str(frame_id))
     if annotation:
         image = draw_shapes(image, annotation)
 
