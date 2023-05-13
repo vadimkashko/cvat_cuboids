@@ -213,7 +213,7 @@ def show_image(task_id, job_id, frame_id, segments, annotations):
             'y': 'y, points'
         },
         title=
-        f'''<a href="{cvat_host}/tasks/{task_id}/jobs/{job_id}?frame={frame_id}">To CVAT farme</a>''',
+        f'''<a href="{cvat_host}/tasks/{task_id}/jobs/{job_id}?frame={frame_id}">To CVAT frame</a>''',
         width=image.width,
         aspect='auto',
         template='seaborn',
