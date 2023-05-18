@@ -48,7 +48,7 @@ env.read_env('.env')
 cvat_host = env.str('CVAT_HOST')
 cvat_creds = (env.str('CVAT_USER'), env.str('CVAT_PASSWORD'))
 
-project_id = 94
+project_id = 133
 client = cvat.make_client(cvat_host)
 client.login(cvat_creds)
 
