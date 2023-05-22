@@ -10,35 +10,36 @@ def draw_shapes(image: Image.Image, annotations: dict) -> Image.Image:
     image = image
     draw = ImageDraw.Draw(image)
     for shape in annotations:
-        corners = [shape['points'][:6], shape['points'][2:]]
-        figures = []
-        for corner in corners:
-            start = corner[:2]
-            middle = corner[2:4]
-            end = corner[4:]
-            center = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
-            unknown = [2 * center[0] - middle[0], 2 * center[1] - middle[1]]
-            figures.append([*start, *middle, *end, *unknown])
+        if shape['attributes'][1]:
+            corners = [shape['points'][:6], shape['points'][2:]]
+            figures = []
+            for corner in corners:
+                start = corner[:2]
+                middle = corner[2:4]
+                end = corner[4:]
+                center = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
+                unknown = [2 * center[0] - middle[0], 2 * center[1] - middle[1]]
+                figures.append([*start, *middle, *end, *unknown])
 
-        new_corners = [[*figures[0][:4], *figures[1][6:]],
-                       [*figures[1][4:6], *figures[1][2:4], *figures[0][6:]]]
+            new_corners = [[*figures[0][:4], *figures[1][6:]],
+                        [*figures[1][4:6], *figures[1][2:4], *figures[0][6:]]]
 
-        for corner in new_corners:
-            start = corner[:2]
-            middle = corner[2:4]
-            end = corner[4:]
-            center = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
-            unknown = [2 * center[0] - middle[0], 2 * center[1] - middle[1]]
-            figures.append([*start, *middle, *end, *unknown])
+            for corner in new_corners:
+                start = corner[:2]
+                middle = corner[2:4]
+                end = corner[4:]
+                center = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
+                unknown = [2 * center[0] - middle[0], 2 * center[1] - middle[1]]
+                figures.append([*start, *middle, *end, *unknown])
 
-        figures.append([
-            *figures[0][:2], *figures[0][6:], *figures[3][6:], *figures[2][6:]
-        ])
+            figures.append([
+                *figures[0][:2], *figures[0][6:], *figures[3][6:], *figures[2][6:]
+            ])
 
-        if shape['type'] == 'polyline':
-            for figure in figures:
-                draw.polygon(figure, outline='#00ff00', width=1)
-            draw.line(shape['points'], fill='#ff0000', width=1)
+            if shape['type'] == 'polyline':
+                for figure in figures:
+                    draw.polygon(figure, outline=shape['color'], width=1)
+                draw.line(shape['points'], fill='#3d3df5', width=1)
     return image
 
 
@@ -48,30 +49,40 @@ env.read_env('.env')
 cvat_host = env.str('CVAT_HOST')
 cvat_creds = (env.str('CVAT_USER'), env.str('CVAT_PASSWORD'))
 
-project_id = 133
+projects_ids = [138, 139]
 client = cvat.make_client(cvat_host)
 client.login(cvat_creds)
 
 app = Dash(__name__)
 server = app.server
 
-project = client.projects.retrieve(project_id)
-task_ids = [{
-    'label': f'{task.id}: {task.name}',
-    'value': task.id
-} for task in sorted(project.get_tasks(), key=lambda x: x.id)]
+projects = [
+    client.projects.retrieve(project_id) for project_id in projects_ids
+]
+projects_ids = [{
+    'label': f'{project.id}: {project.name}',
+    'value': project.id
+} for project in projects]
 
 app.layout = html.Div([
     html.Div(
         [
+            html.P('Project select:'),
+            dcc.Dropdown(options=projects_ids,
+                         value=projects_ids[0]['value'],
+                         id="project-id-dropdown",
+                         clearable=False,
+                         placeholder="Select project",
+                         style={
+                             'width': 300,
+                             'margin': '0 auto'
+                         }),
             html.P('Task select:'),
-            dcc.Dropdown(options=task_ids,
-                         value=task_ids[0]['value'],
-                         id="task-id-dropdown",
+            dcc.Dropdown(id="task-id-dropdown",
                          clearable=False,
                          placeholder="Select task",
                          style={
-                             'width': 400,
+                             'width': 300,
                              'margin': '0 auto'
                          }),
             html.P('Job select:'),
@@ -79,7 +90,7 @@ app.layout = html.Div([
                          clearable=False,
                          placeholder="Select job",
                          style={
-                             'width': 400,
+                             'width': 300,
                              'margin': '0 auto'
                          }),
             html.P('Выбор фрейма:'),
@@ -90,7 +101,7 @@ app.layout = html.Div([
                       inputMode='numeric',
                       style={
                           'height': 32,
-                          'width': 400,
+                          'width': 300,
                           'margin': '0 auto'
                       })
         ],
@@ -116,17 +127,37 @@ app.layout = html.Div([
                   'autosizable': True,
                   'displayModeBar': True
               }),
+    dcc.Store(id='labels', storage_type='session'),
     dcc.Store(id='segments', storage_type='session'),
     dcc.Store(id='job-annotations', storage_type='session')
 ],
                       style={'text-align': 'center'})
 
 
+@app.callback(Output('task-id-dropdown', 'options'),
+              Output('task-id-dropdown', 'value'),
+              Output('labels', 'data'),
+              Input('project-id-dropdown', 'value'))
+def update_task_id_dropdown(selected_project):
+    project = client.projects.retrieve(selected_project)
+    labels = {label.id: label.to_dict() for label in project.labels}
+
+    tasks = [{
+        'label': f'{task.id}: {task.name}',
+        'value': task.id
+    } for task in sorted(project.get_tasks(), key=lambda x: x.id)]
+
+    return tasks, tasks[0]['value'], labels
+
+
 @app.callback(Output('job-id-dropdown', 'options'),
-              Output('job-id-dropdown', 'value'), Output('segments', 'data'),
-              Input('task-id-dropdown', 'value'))
+              Output('job-id-dropdown', 'value'),
+              Output('segments', 'data'),
+              Input('task-id-dropdown', 'value'),
+              prevent_initial_call=True)
 def update_job_id_dropdown(selected_task):
     task = client.tasks.retrieve(selected_task)
+    # jobs = sorted([job.id for job in task.get_jobs()])
     segments = {
         segment['jobs'][0]['id']: (
             segment['start_frame'],
@@ -170,20 +201,22 @@ def sync_frame_id_inputs(input_value, slider_value):
 
 
 @app.callback(Output('job-annotations', 'data'),
-              Input('job-id-dropdown', 'value'))
-def get_job_annotations(job_id):
+              Input('job-id-dropdown', 'value'), Input('labels', 'data'))
+def get_job_annotations(job_id, labels):
     job = client.jobs.retrieve(job_id)
     job_annotations = job.get_annotations()
     annotations = {}
     for shape in job_annotations.shapes:
         attributes = [attribute.value for attribute in shape.attributes]
         frame = shape.frame
+        color = labels[str(shape.label_id)]['color']
         points = shape.points
         shape_type = shape.type.value
         id_exists = annotations.get(frame)
         shape_dict = {
             'attributes': attributes,
             'type': shape_type,
+            'color': color,
             'points': points
         }
         if not id_exists:
@@ -196,9 +229,9 @@ def get_job_annotations(job_id):
 
 @app.callback(Output("image", "figure"), Input('task-id-dropdown', 'value'),
               Input('job-id-dropdown', 'value'),
-              Input('frame-id-input', 'value'), Input('segments', 'data'),
-              Input('job-annotations', 'data'))
-def show_image(task_id, job_id, frame_id, segments, annotations):
+              Input('frame-id-input', 'value'), Input('job-annotations',
+                                                      'data'))
+def show_image(task_id, job_id, frame_id, annotations):
     job = client.jobs.retrieve(job_id)
     image = job.get_frame(frame_id, quality='original')
     image = Image.open(image)  # type: ignore
@@ -213,7 +246,7 @@ def show_image(task_id, job_id, frame_id, segments, annotations):
             'y': 'y, points'
         },
         title=
-        f'''<a href="{cvat_host}/tasks/{task_id}/jobs/{job_id}?frame={frame_id}">To CVAT frame</a>''',
+        f'''<a href="{cvat_host}/tasks/{task_id}/jobs/{job_id}?frame={frame_id}">To CVAT farme</a>''',
         width=image.width,
         aspect='auto',
         template='seaborn',
