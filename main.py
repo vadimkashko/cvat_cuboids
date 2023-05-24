@@ -19,9 +19,9 @@ def draw_shapes(image: Image.Image, annotations: dict) -> Image.Image:
     draw = ImageDraw.Draw(image)
 
     line_width = 1
-    if image.width * image.height >= 1000000:
+    if image.width * image.height >= 2000000:
         line_width = 2
-    elif image.width * image.height >= 3000000:
+    elif image.width * image.height >= 4000000:
         line_width = 3
 
     for shape in annotations:
