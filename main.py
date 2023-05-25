@@ -280,7 +280,7 @@ def get_job_annotations(job_id, labels, attributes):
                                                       'data'))
 def show_image(task_id, job_id, frame_id, annotations):
     job = client.jobs.retrieve(job_id)
-    image = job.get_frame(frame_id, quality='70')
+    image = job.get_frame(frame_id, quality='compressed')
     image = Image.open(image)  # type: ignore
     annotation = annotations.get(str(frame_id))
     if annotation:
